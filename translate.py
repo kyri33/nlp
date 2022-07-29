@@ -11,6 +11,8 @@ from tensorflow.keras import layers
 from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
 
+BATCH_SIZE = 64
+
 def load_pairs(MAX=100):
 	filepath = './spa-eng/spa.txt'
 	f = open(filepath, 'r')
@@ -58,6 +60,32 @@ def make_model_1(output_size):
 
 	return model
 
+def generate_preprocess(english_sentences, spanish_sentences):
+	i = 0
+	while True:
+		x_batch = []
+		y_batch = []
+		for _ in range(BATCH_SIZE):
+			if i >= len(english_sentences):
+				i = 0
+			eng_sent = english_sentences[i].split()
+			span_sent = spanish_sentences[i].split()
+			if len(eng_sent) < FINAL_MAX:
+				[eng_sent.append('NULL') for i in range(FINAL_MAX - len(eng_sent))]
+			if len(span_sent) < FINAL_MAX:
+				[span_sent.append('NULL') for i in range(FINAL_MAX - len(span_sent))]
+
+			x_item = label_eng.transform(np.array(eng_sent))
+			x_item = onehot_eng.transform(x_item.reshape(-1, 1))
+			
+			y_item = label_span.transform(np.array(span_sent))
+			y_item = onehot_span.transform(y_item.reshape(-1, 1))
+
+			x_batch.append(x_item)
+			y_batch.append(y_item)
+
+		yield np.array(x_batch), np.array(y_batch)
+
 if __name__ == "__main__":
 
 	english_sentences, spanish_sentences = load_pairs(MAX=10000)
@@ -79,6 +107,7 @@ if __name__ == "__main__":
 	FINAL_MAX = MAX_ENG if MAX_ENG > MAX_SPAN else MAX_SPAN
 	print("final", FINAL_MAX)
 
+	'''
 	x = []
 	y = []
 	for i in tqdm(range(len(english_sentences))):
@@ -104,12 +133,13 @@ if __name__ == "__main__":
 	y = np.array(y)
 	print(x.shape)
 	print(y.shape)
+	'''
 
 	model = make_model_1(len(unique_spanish))
 	#model.build(input_shape=(1, x.shape[1], x.shape[2]))
 	#print(model.summary())
 
-	model.fit(x, y, batch_size=64, validation_split=0.2, epochs=10)
+	model.fit(generate_preprocess(english_sentences, spanish_sentences), epochs=10, steps_per_epoch = len(english_sentences) // BATCH_SIZE)
 
 	model.save('models/model_1')
 
