@@ -88,7 +88,7 @@ def generate_preprocess(english_sentences, spanish_sentences):
 
 if __name__ == "__main__":
 
-	english_sentences, spanish_sentences = load_pairs(MAX=10000)
+	english_sentences, spanish_sentences = load_pairs(MAX=1000000)
 
 	unique_english = ['NULL']
 	unique_spanish = ['NULL']
