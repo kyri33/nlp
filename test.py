@@ -2,10 +2,11 @@
 import pickle
 from tensorflow import keras
 import numpy as np
+import string
 
 if __name__ == "__main__":
 	
-	max_size = 8
+	max_size = 70
 	model = keras.models.load_model('models/model_1')
 	label_eng = None
 	onehot_eng = None
@@ -33,10 +34,13 @@ if __name__ == "__main__":
 		print('input text is')
 		print(input_text)
 
-		input_text = input_text.strip().lower()
-		x_val = label_eng.transform(np.array(input_text.split()))
+		input_text = input_text.strip().lower().translate(str.maketrans('', '', string.punctuation)).lower()
+		input_text = input_text.split()
+		if len(input_text) < max_size:
+			[input_text.append('NULL') for i in range(max_size - len(input_text))]
+
+		x_val = label_eng.transform(np.array(input_text))
 		x_val = onehot_eng.transform(x_val.reshape(-1, 1))
-		x_val = np.concatenate((x_val, np.zeros_like(x_val, shape=(max_size - x_val.shape[0], x_val.shape[1]))))
 
 		x_val = x_val.reshape(1, x_val.shape[0], x_val.shape[1])
 

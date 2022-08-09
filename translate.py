@@ -8,8 +8,9 @@ import string
 from tqdm import tqdm
 from tensorflow.keras import models
 from tensorflow.keras import layers
-from tensorflow.keras.losses import categorical_crossentropy
+from tensorflow.keras.losses import categorical_crossentropy, sparse_categorical_crossentropy
 from tensorflow.keras.optimizers import Adam
+import random
 
 BATCH_SIZE = 64
 
@@ -19,7 +20,10 @@ def load_pairs(MAX=100):
 	english = []
 	spanish = []
 	count = 0
-	for line in f.readlines():
+	lines = f.readlines()
+	random.shuffle(lines)
+	f.close()
+	for line in lines:
 		line = line.translate(str.maketrans('', '', string.punctuation)).lower()
 		eng, span = line.split('\t')[0:2]
 		english.append(eng)
@@ -55,9 +59,51 @@ def make_model_1(output_size):
 	model.add(layers.Dropout(0.5))
 	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
 
-	model.compile(loss=categorical_crossentropy,
+	model.compile(loss=sparse_categorical_crossentropy,
 		optimizer=Adam(0.005), metrics=['accuracy'])
 
+	return model
+
+def make_model_2(english_vocab_size, output_size, max_size):
+
+	model = models.Sequential()
+	model.add(layers.Embedding(english_vocab_size, 256, input_length=max_size))
+	model.add(layers.GRU(256, return_sequences=True))
+	model.add(layers.TimeDistributed(layers.Dense(1024, activation='relu')))
+	model.add(layers.Dropout(0.5))
+	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
+
+	model.compile(loss=sparse_categorical_crossentropy, optimizer=Adam(0.005), metrics=['accuracy'])
+
+	return model
+
+def make_model_3(output_size):
+	model = models.Sequential()
+	model.add(layers.Bidirectional(layers.GRU(128, return_sequences=True)))
+	model.add(layers.TimeDistributed(layers.Dense(1024, activation='relu')))
+	model.add(layers.Dropout(0.5))
+	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
+
+	model.compile(loss=sparse_categorical_crossentropy, 
+		optimizer=Adam(0.003), metrics=['accuracy'])
+
+	return model
+
+def make_model_4(output_size, seq_length):
+	model = models.Sequential()
+	# encoder
+	model.add(layers.GRU(256, go_backwards=True))
+	model.add(layers.RepeatVector(seq_length))
+
+	# decoder
+	model.add(layers.Gru(256, return_sequences=True))
+	model.add(layers.TimeDistributed(layers.Dense(1024, activation='relu')))
+	model.add(layers.Dropout(0.5))
+	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
+
+	model.compile(loss=sparse_categorical_crossentropy,
+		optimizer=optimizers.Adam(0.001), metrics=['accuracy'])
+	
 	return model
 
 def generate_preprocess(english_sentences, spanish_sentences):
@@ -79,12 +125,16 @@ def generate_preprocess(english_sentences, spanish_sentences):
 			x_item = onehot_eng.transform(x_item.reshape(-1, 1))
 			
 			y_item = label_span.transform(np.array(span_sent))
-			y_item = onehot_span.transform(y_item.reshape(-1, 1))
+			#y_item = onehot_span.transform(y_item.reshape(-1, 1))
 
 			x_batch.append(x_item)
 			y_batch.append(y_item)
-
-		yield np.array(x_batch), np.array(y_batch)
+			i += 1
+		
+		x_batch = np.array(x_batch)
+		y_batch = np.array(y_batch)
+		#print('ybatch', y_batch.shape)
+		yield x_batch, y_batch
 
 if __name__ == "__main__":
 
@@ -135,7 +185,10 @@ if __name__ == "__main__":
 	print(y.shape)
 	'''
 
-	model = make_model_1(len(unique_spanish))
+	#model = make_model_1(len(unique_spanish))
+	#model = make_model_2(len(unique_english), len(unique_spanish), FINAL_MAX)
+	#model = make_model_3(len(unique_spanish))
+	model = make_model_4(len(unique_spanish), FINAL_MAX)
 	#model.build(input_shape=(1, x.shape[1], x.shape[2]))
 	#print(model.summary())
 
@@ -157,23 +210,21 @@ if __name__ == "__main__":
 		f.close()
 
 	#test_sentence = 'i am going to the shop now'
-	test_sentence = "i will win NULL NULL NULL"
+	test_sentence = "i will win"
 
-	test_x = label_eng.transform(np.array(test_sentence.split()))
+	test_sentence = test_sentence.split()
+	if len(test_sentence) < FINAL_MAX:
+		[test_sentence.append('NULL') for i in range(FINAL_MAX - len(test_sentence))]
+
+	test_x = label_eng.transform(np.array(test_sentence))
 	test_x = onehot_eng.transform(test_x.reshape(-1, 1))
-	test_x = np.concatenate((test_x, np.zeros_like(test_x, shape=(FINAL_MAX - test_x.shape[0], test_x.shape[1]))))
 
 	test_x = test_x.reshape(1, test_x.shape[0], test_x.shape[1])
-	print('test x', test_x.shape)
 	test_y = model.predict(test_x)
-	print('test y', test_y.shape)
-
 	outsent = []
 	for word_oh in test_y[0]:
 		max_idx = np.argmax(word_oh)
-		print('max', max_idx)
 		label = label_span.inverse_transform([max_idx])
-		print(label)
 		outsent.append(label[0])
 	
 	print(' '.join(outsent))
