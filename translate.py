@@ -96,14 +96,35 @@ def make_model_4(output_size, seq_length):
 	model.add(layers.RepeatVector(seq_length))
 
 	# decoder
-	model.add(layers.Gru(256, return_sequences=True))
+	model.add(layers.GRU(256, return_sequences=True))
 	model.add(layers.TimeDistributed(layers.Dense(1024, activation='relu')))
 	model.add(layers.Dropout(0.5))
 	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
 
 	model.compile(loss=sparse_categorical_crossentropy,
-		optimizer=optimizers.Adam(0.001), metrics=['accuracy'])
+		optimizer=Adam(0.001), metrics=['accuracy'])
 	
+	return model
+
+def make_model_5(english_vocab_size, output_size, max_size):
+	model = models.Sequential()
+
+	# Embedding
+	model.add(layers.Embedding(english_vocab_size, 128, input_length=max_size))
+
+	# Encoder
+	model.add(layers.Bidirectional(Layers.GRU(128)))
+	model.add(layers.RepeatVector(max_size))
+
+	# Decoder
+	model.add(layers.Bidirectional(Layers.GRU(128, return_sequences=True)))
+	model.add(layers.TimeDistributed(layers.Dense(512, activation='relu')))
+
+	model.add(layers.Dropout(0.5))
+	model.add(layers.TimeDistributed(layers.Dense(output_size, activation='softmax')))
+
+	model.compile(loss=sparse_categorical_crossentropy, optimizer=Adam(0.003), metrics=['accuracy'])
+
 	return model
 
 def generate_preprocess(english_sentences, spanish_sentences):
@@ -188,11 +209,12 @@ if __name__ == "__main__":
 	#model = make_model_1(len(unique_spanish))
 	#model = make_model_2(len(unique_english), len(unique_spanish), FINAL_MAX)
 	#model = make_model_3(len(unique_spanish))
-	model = make_model_4(len(unique_spanish), FINAL_MAX)
+	#model = make_model_4(len(unique_spanish), FINAL_MAX)
+	model = make_model_5(len(unique_english), len(unique_spanish), FINAL_MAX)
 	#model.build(input_shape=(1, x.shape[1], x.shape[2]))
 	#print(model.summary())
 
-	model.fit(generate_preprocess(english_sentences, spanish_sentences), epochs=10, steps_per_epoch = len(english_sentences) // BATCH_SIZE)
+	model.fit(generate_preprocess(english_sentences, spanish_sentences), epochs=5, steps_per_epoch = len(english_sentences) // BATCH_SIZE)
 
 	model.save('models/model_1')
 
