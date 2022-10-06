@@ -6,7 +6,7 @@ import string
 
 if __name__ == "__main__":
 	
-	max_size = 70
+	max_size = 30
 	model = keras.models.load_model('models/model_1')
 	label_eng = None
 	onehot_eng = None
@@ -40,9 +40,9 @@ if __name__ == "__main__":
 			[input_text.append('NULL') for i in range(max_size - len(input_text))]
 
 		x_val = label_eng.transform(np.array(input_text))
-		x_val = onehot_eng.transform(x_val.reshape(-1, 1))
+		#x_val = onehot_eng.transform(x_val.reshape(-1, 1))
 
-		x_val = x_val.reshape(1, x_val.shape[0], x_val.shape[1])
+		x_val = x_val.reshape(1, x_val.shape[0])#, x_val.shape[1])
 
 		translation = model.predict(x_val)
 

@@ -26,6 +26,10 @@ def load_pairs(MAX=100):
 	for line in lines:
 		line = line.translate(str.maketrans('', '', string.punctuation)).lower()
 		eng, span = line.split('\t')[0:2]
+
+		if len(eng.split()) > 17 or len(span.split()) > 17:
+			continue
+
 		english.append(eng)
 		spanish.append(span)
 		
@@ -111,13 +115,14 @@ def make_model_5(english_vocab_size, output_size, max_size):
 
 	# Embedding
 	model.add(layers.Embedding(english_vocab_size, 128, input_length=max_size))
+	#model.add(layers.GRU(128, return_sequences=True))
 
 	# Encoder
-	model.add(layers.Bidirectional(Layers.GRU(128)))
+	model.add(layers.Bidirectional(layers.GRU(128)))
 	model.add(layers.RepeatVector(max_size))
 
 	# Decoder
-	model.add(layers.Bidirectional(Layers.GRU(128, return_sequences=True)))
+	model.add(layers.Bidirectional(layers.GRU(128, return_sequences=True)))
 	model.add(layers.TimeDistributed(layers.Dense(512, activation='relu')))
 
 	model.add(layers.Dropout(0.5))
@@ -143,7 +148,7 @@ def generate_preprocess(english_sentences, spanish_sentences):
 				[span_sent.append('NULL') for i in range(FINAL_MAX - len(span_sent))]
 
 			x_item = label_eng.transform(np.array(eng_sent))
-			x_item = onehot_eng.transform(x_item.reshape(-1, 1))
+			#x_item = onehot_eng.transform(x_item.reshape(-1, 1))
 			
 			y_item = label_span.transform(np.array(span_sent))
 			#y_item = onehot_span.transform(y_item.reshape(-1, 1))
@@ -178,34 +183,6 @@ if __name__ == "__main__":
 	FINAL_MAX = MAX_ENG if MAX_ENG > MAX_SPAN else MAX_SPAN
 	print("final", FINAL_MAX)
 
-	'''
-	x = []
-	y = []
-	for i in tqdm(range(len(english_sentences))):
-		eng_sent = english_sentences[i].split()
-		span_sent = spanish_sentences[i].split()
-		if len(eng_sent) < FINAL_MAX:
-			[eng_sent.append('NULL') for i in range(FINAL_MAX - len(eng_sent))]
-		if len(span_sent) < FINAL_MAX:
-			[span_sent.append('NULL') for i in range(FINAL_MAX - len(span_sent))]
-
-		x_item = label_eng.transform(np.array(eng_sent))
-		x_item = onehot_eng.transform(x_item.reshape(-1, 1))
-		#x_item = np.concatenate((x_item, np.zeros_like(x_item, shape=(FINAL_MAX - x_item.shape[0], x_item.shape[1]))))
-		
-		y_item = label_span.transform(np.array(span_sent))
-		y_item = onehot_span.transform(y_item.reshape(-1, 1))
-		#y_item = np.concatenate((y_item, np.zeros_like(y_item, shape=(FINAL_MAX - y_item.shape[0], y_item.shape[1]))))
-
-		x.append(x_item)
-		y.append(y_item)
-	
-	x = np.array(x)
-	y = np.array(y)
-	print(x.shape)
-	print(y.shape)
-	'''
-
 	#model = make_model_1(len(unique_spanish))
 	#model = make_model_2(len(unique_english), len(unique_spanish), FINAL_MAX)
 	#model = make_model_3(len(unique_spanish))
@@ -214,7 +191,7 @@ if __name__ == "__main__":
 	#model.build(input_shape=(1, x.shape[1], x.shape[2]))
 	#print(model.summary())
 
-	model.fit(generate_preprocess(english_sentences, spanish_sentences), epochs=5, steps_per_epoch = len(english_sentences) // BATCH_SIZE)
+	model.fit(generate_preprocess(english_sentences, spanish_sentences), epochs=7, steps_per_epoch = len(english_sentences) // BATCH_SIZE)
 
 	model.save('models/model_1')
 
@@ -232,14 +209,14 @@ if __name__ == "__main__":
 		f.close()
 
 	#test_sentence = 'i am going to the shop now'
-	test_sentence = "i will win"
+	test_sentence = "im glad you warned me before it was too late"
 
 	test_sentence = test_sentence.split()
 	if len(test_sentence) < FINAL_MAX:
 		[test_sentence.append('NULL') for i in range(FINAL_MAX - len(test_sentence))]
 
 	test_x = label_eng.transform(np.array(test_sentence))
-	test_x = onehot_eng.transform(test_x.reshape(-1, 1))
+	#test_x = onehot_eng.transform(test_x.reshape(-1, 1))
 
 	test_x = test_x.reshape(1, test_x.shape[0], test_x.shape[1])
 	test_y = model.predict(test_x)
